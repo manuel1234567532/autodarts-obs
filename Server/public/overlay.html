@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Autodarts Overlay</title>
+  <meta http-equiv="refresh" content="600">
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 20px;
+      font-family: "Segoe UI", sans-serif;
+      background: transparent;
+      color: white;
+      font-size: 32px;
+    }
+
+    #overlay-container {
+      display: none;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 80px;
+      transition: opacity 0.5s ease;
+      margin-top: 50px;
+    }
+
+    .player {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 30px;
+      background: linear-gradient(145deg, rgb(39 89 155 / 90%), rgb(46 47 107 / 84%));
+      border-radius: 20px;
+      min-width: 300px;
+      box-shadow: 0 0 20px rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(10px);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .active {
+      box-shadow: 0 0 25px #00cfff;
+      transform: scale(1.05);
+    }
+
+    .name {
+      font-weight: bold;
+      font-size: 40px;
+      margin-bottom: 20px;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+    }
+
+    .score {
+      font-size: 72px;
+      font-weight: bold;
+      transition: all 0.3s ease;
+    }
+
+    .score.changed {
+      animation: pulse 0.5s ease;
+    }
+
+    .last-throws {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    .throw {
+      padding: 6px 12px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+      font-size: 24px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .throw-icon {
+      font-size: 20px;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); color: #fff; }
+      50% { transform: scale(1.3); color: #ffd700; }
+      100% { transform: scale(1); color: #fff; }
+    }
+
+    #winner {
+      position: absolute;
+      top: 40%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 80px;
+      font-weight: 900;
+      background: linear-gradient(90deg, #00ff88, #00cfff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 0 60px rgba(0,255,200,0.9);
+      opacity: 0;
+      z-index: 999;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    .show-winner {
+      animation: showWinner 2s ease forwards;
+    }
+
+    @keyframes showWinner {
+      0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8) rotate(-10deg); }
+      30% { opacity: 1; transform: translate(-50%, -50%) scale(1.3) rotate(5deg); }
+      60% { transform: translate(-50%, -50%) scale(1.1) rotate(-3deg); }
+      100% { transform: translate(-50%, -50%) scale(1) rotate(0deg); opacity: 1; }
+    }
+
+    #mode-display {
+  font-size: 42px;
+  font-weight: 600;
+  padding: 12px 32px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  color: #ffffff;
+  box-shadow: 0 0 16px rgba(0, 255, 255, 0.4);
+  text-shadow: 0 0 12px #00cfff;
+  opacity: 0;
+  animation: slideDown 1s ease forwards;
+  white-space: nowrap;
+  z-index: 10;
+}
+
+@keyframes slideDown {
+  0% {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+#wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  height: 100vh;
+  width: 100vw;
+  position: relative;
+  padding-top: 40px;
+}
+  </style>
+</head>
+<body>
+  <div id="wrapper">
+    <div id="mode-display">Spielmodus</div>
+    <div id="overlay-container" class="container">
+      <div class="player" id="player1">
+        <div class="name">Player 1</div>
+        <div class="score">501</div>
+        <div class="last-throws" id="throws1"></div>
+      </div>
+      <div class="player" id="player2">
+        <div class="name">Player 2</div>
+        <div class="score">501</div>
+        <div class="last-throws" id="throws2"></div>
+      </div>
+    </div>
+  </div>
+  
+  <div id="winner"></div>
+
+  <script>
+    let previousMatchSignature = "";
+    let matchFinished = false;
+    let previousScores = { score1: 501, score2: 501 };
+    let currentPlayer = 0;
+    let currentMode = "";
+
+    function getThrowIcon(val) {
+      if (val >= 60) return "🎯";
+      if (val >= 40) return "💥";
+      if (val >= 20) return "🎯";
+      return "⚪";
+    }
+
+    function resetOverlay() {
+      matchFinished = false;
+      previousScores = { score1: 501, score2: 501 };
+
+      document.getElementById("overlay-container").style.display = "flex";
+      const winnerEl = document.getElementById("winner");
+      winnerEl.textContent = "";
+      winnerEl.classList.remove("show-winner");
+      winnerEl.style.opacity = 0;
+
+      document.querySelector("#player1 .name").textContent = "Player 1";
+      document.querySelector("#player2 .name").textContent = "Player 2";
+      document.querySelector("#player1 .score").textContent = "501";
+      document.querySelector("#player2 .score").textContent = "501";
+
+      document.getElementById("throws1").innerHTML = "";
+      document.getElementById("throws2").innerHTML = "";
+    }
+
+    function showWinner(name) {
+      document.getElementById("overlay-container").style.display = "none";
+      const winnerEl = document.getElementById("winner");
+      winnerEl.textContent = `${name} gewinnt!`;
+      winnerEl.classList.add("show-winner");
+    }
+
+    function updateScore(playerId, newScore, scoreKey) {
+      const scoreEl = document.querySelector(`#${playerId} .score`);
+      if (previousScores[scoreKey] !== newScore) {
+        scoreEl.textContent = newScore;
+        scoreEl.classList.add("changed");
+        setTimeout(() => scoreEl.classList.remove("changed"), 500);
+        previousScores[scoreKey] = newScore;
+      }
+    }
+
+    function updateThrows(containerId, throwsArray) {
+      const container = document.getElementById(containerId);
+      container.innerHTML = "";
+      throwsArray.slice(-3).forEach(val => {
+        const el = document.createElement("div");
+        el.className = "throw";
+        el.innerHTML = `<span class="throw-icon">${getThrowIcon(val)}</span> ${val}`;
+        container.appendChild(el);
+      });
+    }
+
+    async function updateOverlay() {
+      try {
+        const response = await fetch("http://localhost:3000/overlay");
+        const data = await response.json();
+
+        if (!data.player1 || !data.player2) return;
+
+        const newSignature = `${data.player1}-${data.player2}`;
+        if (newSignature !== previousMatchSignature) {
+          previousMatchSignature = newSignature;
+          resetOverlay();
+          console.log("[Overlay] Neues Match erkannt.");
+        }
+
+        if (!matchFinished && (data.score1 === 0 || data.score2 === 0)) {
+          const winnerName = data.score1 === 0 ? data.player1 : data.player2;
+          showWinner(winnerName);
+          matchFinished = true;
+          return;
+        }
+
+        const container = document.getElementById("overlay-container");
+        if (container.style.display !== "flex" && !matchFinished) {
+          container.style.display = "flex";
+        }
+
+        document.querySelector("#player1 .name").textContent = data.player1;
+        document.querySelector("#player2 .name").textContent = data.player2;
+
+        document.querySelector("#player1").classList.remove("active");
+        document.querySelector("#player2").classList.remove("active");
+        if (typeof data.player === "number") {
+          currentPlayer = data.player;
+          document.querySelector(`#player${currentPlayer + 1}`).classList.add("active");
+        }
+
+        const modeEl = document.getElementById("mode-display");
+if (data.mode && data.mode !== currentMode) {
+  currentMode = data.mode;
+  modeEl.textContent = data.mode;
+  modeEl.style.animation = "none";
+  void modeEl.offsetWidth;
+  modeEl.style.animation = "slideDown 1s ease forwards";
+  modeEl.style.opacity = 1;
+}
+
+        updateScore("player1", data.score1, "score1");
+        updateScore("player2", data.score2, "score2");
+
+        updateThrows("throws1", data.throws1 || []);
+        updateThrows("throws2", data.throws2 || []);
+
+      } catch (err) {
+        console.error("Fehler beim Laden:", err);
+      }
+    }
+
+    setInterval(updateOverlay, 1000);
+    updateOverlay();
+  </script>
+</body>
+</html>

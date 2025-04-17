@@ -1,0 +1,28 @@
+{
+    "manifest_version": 3,
+    "name": "Autodarts Match Tracker",
+    "version": "1.0",
+    "permissions": [
+      "scripting",
+      "tabs",
+      "webRequest",
+      "webRequestAuthProvider",
+      "storage"
+    ],
+    "host_permissions": [
+      "https://api.autodarts.io/*"
+    ],
+    "background": {
+      "service_worker": "background.js"
+    },
+    "content_scripts": [
+      {
+        "matches": ["https://play.autodarts.io/matches/*"],
+        "js": ["content.js"]
+      }
+    ],
+    "action": {
+      "default_title": "Autodarts Tracker"
+    }
+  }
+  
